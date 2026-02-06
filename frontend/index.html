@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Code Doctor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg-primary:   #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary:  #1c2333;
+      --bg-input:     #0d1117;
+      --border:       #30363d;
+      --border-focus: #58a6ff;
+      --text-primary: #e6edf3;
+      --text-secondary:#8b949e;
+      --text-muted:   #6e7681;
+      --accent:       #58a6ff;
+      --accent-green: #3fb950;
+      --accent-orange:#d29922;
+      --accent-red:   #f85149;
+      --accent-purple:#bc8cff;
+      --accent-cyan:  #39d2c0;
+      --radius:       8px;
+      --radius-lg:    12px;
+      --font-sans:    "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+      --font-mono:    "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.25rem;
+      height: 48px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .topbar-logo {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .topbar-logo svg { width: 20px; height: 20px; }
+    .topbar-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--border);
+    }
+    .topbar-file {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+    .topbar-file .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: background 0.3s;
+    }
+    .topbar-file .dot.active { background: var(--accent-green); }
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .model-select-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .model-select-wrap label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .model-select {
+      padding: 0.3rem 1.8rem 0.3rem 0.55rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%238b949e' d='M5 7L1 3h8z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.5rem center;
+    }
+    .model-select:focus { outline: none; border-color: var(--accent); }
+    .model-indicator {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    .panel-left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      min-width: 0;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1rem;
+      height: 38px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .panel-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-secondary);
+    }
+
+    .upload-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.8rem;
+      padding: 3rem 2rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      flex: 1;
+    }
+    .upload-zone:hover { background: rgba(88,166,255,0.04); }
+    .upload-zone.dragover { background: rgba(88,166,255,0.08); }
+    .upload-zone.hidden { display: none; }
+    .upload-icon { color: var(--text-muted); }
+    .upload-icon svg { width: 40px; height: 40px; }
+    .upload-text {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      text-align: center;
+    }
+    .upload-text strong { color: var(--accent); cursor: pointer; }
+    .upload-hint { font-size: 0.75rem; color: var(--text-muted); }
+
+    #file-input { display: none; }
+
+    .code-view {
+      flex: 1;
+      overflow: auto;
+      display: none;
+      position: relative;
+    }
+    .code-view.visible { display: flex; }
+    .line-numbers {
+      padding: 0.75rem 0;
+      text-align: right;
+      user-select: none;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      min-width: 48px;
+      flex-shrink: 0;
+    }
+    .line-numbers span {
+      display: block;
+      padding: 0 0.6rem;
+    }
+    .code-content {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      line-height: 1.6;
+      white-space: pre;
+      overflow-x: auto;
+      color: var(--text-primary);
+      tab-size: 4;
+    }
+
+    .file-bar {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1rem;
+      height: 32px;
+      background: var(--bg-tertiary);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .file-bar.visible { display: flex; }
+    .file-meta {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .file-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .file-action-btn {
+      padding: 0.15rem 0.5rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.7rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .file-action-btn:hover {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+    }
+
+    .panel-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    .action-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.4rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .action-btn:hover {
+      border-color: var(--accent);
+      color: var(--text-primary);
+      background: rgba(88,166,255,0.08);
+    }
+    .action-btn.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(88,166,255,0.1);
+    }
+    .action-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .action-btn:disabled:hover {
+      border-color: var(--border);
+      color: var(--text-secondary);
+      background: var(--bg-tertiary);
+    }
+    .action-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    .action-btn.explain:hover,  .action-btn.explain.active  { border-color: var(--accent);       color: var(--accent);       background: rgba(88,166,255,0.1); }
+    .action-btn.bugs:hover,     .action-btn.bugs.active     { border-color: var(--accent-red);    color: var(--accent-red);    background: rgba(248,81,73,0.1); }
+    .action-btn.improve:hover,  .action-btn.improve.active  { border-color: var(--accent-green);  color: var(--accent-green);  background: rgba(63,185,80,0.1); }
+    .action-btn.refactor:hover, .action-btn.refactor.active { border-color: var(--accent-purple); color: var(--accent-purple); background: rgba(188,140,255,0.1); }
+    .action-btn.document:hover, .action-btn.document.active { border-color: var(--accent-orange); color: var(--accent-orange); background: rgba(210,153,34,0.1); }
+    .action-btn.security:hover, .action-btn.security.active { border-color: var(--accent-cyan);   color: var(--accent-cyan);   background: rgba(57,210,192,0.1); }
+
+    .question-area {
+      display: flex;
+      padding: 0.5rem 0.75rem;
+      gap: 0.5rem;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .question-input {
+      flex: 1;
+      padding: 0.5rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-input);
+      color: var(--text-primary);
+      font-size: 0.85rem;
+      font-family: var(--font-sans);
+      resize: none;
+      min-height: 36px;
+      max-height: 100px;
+    }
+    .question-input::placeholder { color: var(--text-muted); }
+    .question-input:focus { outline: none; border-color: var(--accent); }
+    .send-btn {
+      align-self: flex-end;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      white-space: nowrap;
+    }
+    .send-btn:hover { opacity: 0.85; }
+    .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .send-btn svg { width: 14px; height: 14px; }
+
+    .response-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 0.75rem;
+      padding: 2rem;
+      text-align: center;
+    }
+    .empty-state.hidden { display: none; }
+    .empty-state svg { width: 48px; height: 48px; color: var(--text-muted); opacity: 0.5; }
+    .empty-state p { font-size: 0.85rem; color: var(--text-muted); max-width: 280px; line-height: 1.5; }
+
+    .message {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      animation: fadeIn 0.3s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .message-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.6rem;
+    }
+    .message-role {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+    }
+    .message-role.user {
+      color: var(--accent);
+      background: rgba(88,166,255,0.12);
+    }
+    .message-role.assistant {
+      color: var(--accent-green);
+      background: rgba(63,185,80,0.12);
+    }
+    .message-timestamp {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .message-body {
+      font-size: 0.85rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      color: var(--text-primary);
+    }
+    .message-body.mono {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+    }
+    .message.user-msg {
+      background: rgba(88,166,255,0.03);
+    }
+
+    .loading-indicator {
+      display: none;
+      padding: 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .loading-indicator.visible { display: block; }
+    .loading-dots {
+      display: flex;
+      gap: 0.3rem;
+      align-items: center;
+    }
+    .loading-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: bounce 1.2s infinite;
+    }
+    .loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+    .loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30% { transform: translateY(-6px); opacity: 1; }
+    }
+    .loading-text {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 0.4rem;
+    }
+
+    .statusbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1rem;
+      height: 26px;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+    .statusbar-left, .statusbar-right {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      display: inline-block;
+      margin-right: 0.3rem;
+    }
+    .status-dot.error { background: var(--accent-red); }
+    .status-dot.loading { background: var(--accent-orange); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    @media (max-width: 768px) {
+      .main { flex-direction: column; }
+      .panel-left { border-right: none; border-bottom: 1px solid var(--border); max-height: 45vh; }
+      .panel-right { min-height: 55vh; }
+      .topbar-file { display: none; }
+      .action-bar { overflow-x: auto; flex-wrap: nowrap; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/></svg>
+        AI Code Doctor
+      </div>
+      <div class="topbar-divider"></div>
+      <div class="topbar-file" id="topbar-file">
+        <span class="dot" id="file-dot"></span>
+        <span id="topbar-filename">No file loaded</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <div class="model-select-wrap">
+        <label>Model</label>
+        <select class="model-select" id="model-select">
+          <option value="codellama:7b">codellama:7b</option>
+        </select>
+      </div>
+      <span class="model-indicator" id="model-indicator"></span>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <div class="panel-left">
+      <div class="panel-header">
+        <span class="panel-title">📄 Source Code</span>
+        <div class="file-actions" id="header-actions" style="display:none">
+          <button class="file-action-btn" id="btn-change-file">Change File</button>
+          <button class="file-action-btn" id="btn-clear">Clear</button>
+        </div>
+      </div>
+
+      <div class="upload-zone" id="upload-zone">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+          </svg>
+        </div>
+        <div class="upload-text"><strong>Click to upload</strong> or drag &amp; drop</div>
+        <div class="upload-hint">.py .js .ts .java .c .cpp .go .rs .rb .php and more</div>
+      </div>
+      <input type="file" id="file-input"
+        accept=".py,.js,.ts,.tsx,.jsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rs,.rb,.php,.html,.css,.scss,.sql,.sh,.bash,.txt,.json,.xml,.yaml,.yml,.md,.r,.swift,.kt,.lua,.pl,.ex,.exs,.hs,.scala,.dart,.vue,.svelte,.zig,.toml,.cfg,.ini,.env" />
+
+      <div class="code-view" id="code-view">
+        <div class="line-numbers" id="line-numbers"></div>
+        <div class="code-content" id="code-content"></div>
+      </div>
+
+      <div class="file-bar" id="file-bar">
+        <span class="file-meta" id="file-meta"></span>
+      </div>
+    </div>
+
+    <div class="panel-right">
+      <div class="panel-header">
+        <span class="panel-title">🤖 AI Assistant</span>
+      </div>
+
+      <div class="action-bar" id="action-bar">
+        <button class="action-btn explain" data-action="explain" title="Explain this code">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
+          Explain
+        </button>
+        <button class="action-btn bugs" data-action="bugs" title="Find bugs in this code">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2l1.88 1.88M14.12 3.88L16 2M9 7.13v-1a3.003 3.003 0 116 0v1M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 014-4h4a4 4 0 014 4v3c0 3.3-2.7 6-6 6zM12 20v-9M6.53 9C4.6 8.8 3 7.1 3 5M6 13H2M6 17l-4 1M17.47 9c1.93-.2 3.53-1.9 3.53-4M18 13h4M18 17l4 1"/></svg>
+          Find Bugs
+        </button>
+        <button class="action-btn improve" data-action="improve" title="Suggest improvements">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          Improve
+        </button>
+        <button class="action-btn refactor" data-action="refactor" title="Suggest refactoring">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          Refactor
+        </button>
+        <button class="action-btn document" data-action="document" title="Generate documentation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Document
+        </button>
+        <button class="action-btn security" data-action="security" title="Security audit">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Security
+        </button>
+      </div>
+
+      <div class="question-area">
+        <textarea class="question-input" id="question-input" placeholder="Ask anything about the code…" rows="1"></textarea>
+        <button class="send-btn" id="send-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Ask
+        </button>
+      </div>
+
+      <div class="response-area" id="response-area">
+        <div class="empty-state" id="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <p>Upload a code file, then click an action or type a question to get AI-powered analysis.</p>
+        </div>
+        <div class="loading-indicator" id="loading">
+          <div class="loading-dots"><span></span><span></span><span></span></div>
+          <div class="loading-text" id="loading-text">Analysing code…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <div class="statusbar-left">
+      <span><span class="status-dot" id="status-dot"></span><span id="status-text">Ready</span></span>
+    </div>
+    <div class="statusbar-right">
+      <span id="status-model"></span>
+      <span id="status-file-info"></span>
+    </div>
+  </div>
+
+  <script>
+  (() => {
+    const BASE       = "http://localhost:8000";
+    const ASK_URL    = BASE + "/ask";
+    const MODELS_URL = BASE + "/models";
+
+    const ACTION_PROMPTS = {
+      explain:
+        "Explain this code clearly. Describe what each part does, the overall " +
+        "purpose, and mention time complexity where relevant.",
+      bugs:
+        "Find all bugs, errors, and potential issues in this code. For each bug " +
+        "explain what is wrong, why it is a problem, and how to fix it. Include " +
+        "corrected code snippets.",
+      improve:
+        "Suggest improvements to this code. Cover readability, performance, " +
+        "best practices, and idiomatic style. Provide refactored code where helpful.",
+      refactor:
+        "Refactor this code for better structure, cleaner design, and " +
+        "maintainability. Apply SOLID principles and design patterns where " +
+        "appropriate. Show the refactored version.",
+      document:
+        "Generate comprehensive documentation for this code. Include docstrings, " +
+        "parameter descriptions, return types, usage examples, and inline " +
+        "comments for complex logic.",
+      security:
+        "Perform a security audit of this code. Identify vulnerabilities " +
+        "(injection, XSS, data leaks, insecure defaults, etc.), assess " +
+        "severity, and provide secure alternatives.",
+    };
+
+    // grab all the dom elements we need
+    const fileInput      = document.getElementById("file-input");
+    const uploadZone     = document.getElementById("upload-zone");
+    const codeView       = document.getElementById("code-view");
+    const lineNumbers    = document.getElementById("line-numbers");
+    const codeContent    = document.getElementById("code-content");
+    const fileBar        = document.getElementById("file-bar");
+    const fileMeta       = document.getElementById("file-meta");
+    const headerActions  = document.getElementById("header-actions");
+    const topbarFilename = document.getElementById("topbar-filename");
+    const fileDot        = document.getElementById("file-dot");
+    const modelSelect    = document.getElementById("model-select");
+    const modelIndicator = document.getElementById("model-indicator");
+    const questionInput  = document.getElementById("question-input");
+    const sendBtn        = document.getElementById("send-btn");
+    const actionBtns     = document.querySelectorAll(".action-btn[data-action]");
+    const responseArea   = document.getElementById("response-area");
+    const emptyState     = document.getElementById("empty-state");
+    const loading        = document.getElementById("loading");
+    const loadingText    = document.getElementById("loading-text");
+    const statusDot      = document.getElementById("status-dot");
+    const statusText     = document.getElementById("status-text");
+    const statusModel    = document.getElementById("status-model");
+    const statusFileInfo = document.getElementById("status-file-info");
+    const btnChangeFile  = document.getElementById("btn-change-file");
+    const btnClear       = document.getElementById("btn-clear");
+
+    let currentFile  = null;
+    let currentCode  = "";
+    let isProcessing = false;
+
+    function escapeHtml(s) {
+      const d = document.createElement("div");
+      d.appendChild(document.createTextNode(s));
+      return d.innerHTML;
+    }
+
+    function timestamp() {
+      return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    }
+
+    function setStatus(text, state) {
+      statusText.textContent = text;
+      statusDot.className = "status-dot" + (state === "error" ? " error" : state === "loading" ? " loading" : "");
+    }
+
+    function setActionsEnabled(on) {
+      actionBtns.forEach(b => b.disabled = !on);
+      sendBtn.disabled = !on;
+    }
+
+    // pull the list of models from ollama
+    async function fetchModels() {
+      modelIndicator.textContent = "loading…";
+      try {
+        const res = await fetch(MODELS_URL);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        const models = data.models || [];
+        const def = data.default || "";
+
+        modelSelect.innerHTML = "";
+
+        if (!models.length) {
+          const o = document.createElement("option");
+          o.value = def;
+          o.textContent = def;
+          modelSelect.appendChild(o);
+          modelIndicator.textContent = "no models";
+          return;
+        }
+
+        for (const m of models) {
+          const o = document.createElement("option");
+          o.value = m.name;
+          o.textContent = m.name + "  (" + m.size + ")";
+          if (m.name === def) o.selected = true;
+          modelSelect.appendChild(o);
+        }
+
+        modelIndicator.textContent = models.length + " available";
+        statusModel.textContent = "Model: " + modelSelect.value;
+      } catch (e) {
+        console.error("Couldn't fetch models:", e);
+        modelIndicator.textContent = "offline";
+      }
+    }
+
+    modelSelect.addEventListener("change", () => {
+      statusModel.textContent = "Model: " + modelSelect.value;
+    });
+
+    // file reading
+    function loadFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        currentFile = file;
+        currentCode = e.target.result;
+        showCode();
+        setStatus("Loaded " + file.name, "ok");
+      };
+      reader.onerror = () => setStatus("Failed to read file", "error");
+      reader.readAsText(file);
+    }
+
+    function showCode() {
+      uploadZone.classList.add("hidden");
+      codeView.classList.add("visible");
+      fileBar.classList.add("visible");
+      headerActions.style.display = "flex";
+      fileDot.classList.add("active");
+      topbarFilename.textContent = currentFile.name;
+
+      const lines = currentCode.split("\n");
+      lineNumbers.innerHTML = lines.map((_, i) => "<span>" + (i + 1) + "</span>").join("");
+      codeContent.textContent = currentCode;
+
+      const sizeKB = (currentFile.size / 1024).toFixed(1);
+      fileMeta.textContent = currentFile.name + "  •  " + lines.length + " lines  •  " + sizeKB + " KB";
+      statusFileInfo.textContent = lines.length + " lines";
+      setActionsEnabled(true);
+    }
+
+    function clearFile() {
+      currentFile = null;
+      currentCode = "";
+      uploadZone.classList.remove("hidden");
+      codeView.classList.remove("visible");
+      fileBar.classList.remove("visible");
+      headerActions.style.display = "none";
+      fileDot.classList.remove("active");
+      topbarFilename.textContent = "No file loaded";
+      statusFileInfo.textContent = "";
+      setActionsEnabled(false);
+      setStatus("Ready", "ok");
+    }
+
+    // upload events
+    uploadZone.addEventListener("click", () => fileInput.click());
+    btnChangeFile.addEventListener("click", () => fileInput.click());
+    btnClear.addEventListener("click", clearFile);
+    fileInput.addEventListener("change", () => {
+      if (fileInput.files[0]) loadFile(fileInput.files[0]);
+    });
+
+    uploadZone.addEventListener("dragover", e => {
+      e.preventDefault();
+      uploadZone.classList.add("dragover");
+    });
+    uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("dragover"));
+    uploadZone.addEventListener("drop", e => {
+      e.preventDefault();
+      uploadZone.classList.remove("dragover");
+      if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+    });
+
+    // chat messages
+    function addMessage(role, text) {
+      emptyState.classList.add("hidden");
+      const msg = document.createElement("div");
+      msg.className = "message" + (role === "user" ? " user-msg" : "");
+      msg.innerHTML =
+        '<div class="message-header">' +
+          '<span class="message-role ' + role + '">' + (role === "user" ? "You" : "AI") + "</span>" +
+          '<span class="message-timestamp">' + timestamp() + "</span>" +
+        "</div>" +
+        '<div class="message-body' + (role === "assistant" ? " mono" : "") + '">' +
+          escapeHtml(text) +
+        "</div>";
+      responseArea.insertBefore(msg, loading);
+      responseArea.scrollTop = responseArea.scrollHeight;
+    }
+
+    async function sendRequest(question) {
+      if (!currentFile || !currentCode.trim()) {
+        setStatus("Upload a file first", "error");
+        return;
+      }
+      if (isProcessing) return;
+      isProcessing = true;
+
+      addMessage("user", question);
+
+      setActionsEnabled(false);
+      loading.classList.add("visible");
+      loadingText.textContent = "Analysing with " + modelSelect.value + "…";
+      setStatus("Processing…", "loading");
+
+      const fd = new FormData();
+      fd.append("file", currentFile);
+      fd.append("question", question);
+      fd.append("model", modelSelect.value);
+
+      try {
+        const res = await fetch(ASK_URL, { method: "POST", body: fd });
+        if (!res.ok) {
+          let detail = "Server returned " + res.status;
+          try { detail = (await res.json()).detail || detail; } catch (_) {}
+          throw new Error(detail);
+        }
+        const data = await res.json();
+        addMessage("assistant", data.answer);
+        setStatus("Done", "ok");
+      } catch (err) {
+        console.error(err);
+        addMessage("assistant", "❌ Error: " + err.message);
+        setStatus("Request failed", "error");
+      } finally {
+        loading.classList.remove("visible");
+        isProcessing = false;
+        setActionsEnabled(!!currentFile);
+      }
+    }
+
+    // action buttons (explain, bugs, etc)
+    actionBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const prompt = ACTION_PROMPTS[btn.dataset.action] || "Analyse this code.";
+        actionBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        setTimeout(() => btn.classList.remove("active"), 2000);
+        sendRequest(prompt);
+      });
+    });
+
+    // custom question input
+    sendBtn.addEventListener("click", () => {
+      const q = questionInput.value.trim();
+      if (!q) return;
+      questionInput.value = "";
+      questionInput.style.height = "auto";
+      sendRequest(q);
+    });
+
+    questionInput.addEventListener("keydown", e => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        sendBtn.click();
+      }
+    });
+
+    questionInput.addEventListener("input", () => {
+      questionInput.style.height = "auto";
+      questionInput.style.height = Math.min(questionInput.scrollHeight, 100) + "px";
+    });
+
+    // go
+    setActionsEnabled(false);
+    fetchModels();
+  })();
+  </script>
+</body>
+</html>
